@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gerador de Alerta RCB</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Calibri, sans-serif;
+      font-size: 15px;
+      background: #f0f4f8;
+      color: #1a1a2e;
+      min-height: 100vh;
+      padding: 32px 16px;
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #1E90FF;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 24px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 16px rgba(30,144,255,0.10);
+      padding: 24px 28px;
+      max-width: 860px;
+      margin: 0 auto 24px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      color: #555;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+
+    textarea {
+      width: 100%;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      resize: vertical;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 10px 12px;
+      line-height: 1.5;
+      color: #222;
+      background: #fafafa;
+    }
+
+    textarea:focus { outline: 2px solid #1E90FF; border-color: #1E90FF; }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    button {
+      padding: 9px 22px;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.15s;
+    }
+
+    button:hover { opacity: 0.88; }
+
+    .btn-primary { background: #1E90FF; color: #fff; }
+    .btn-secondary { background: #e8edf3; color: #333; }
+    .btn-download { background: #28a745; color: #fff; display: none; }
+
+    #status {
+      font-size: 13px;
+      margin-left: 8px;
+    }
+
+    /* Preview */
+    #preview-section { display: none; max-width: 860px; margin: 0 auto; }
+
+    #preview-section h2 {
+      font-size: 14px;
+      color: #555;
+      margin-bottom: 8px;
+    }
+
+    iframe {
+      width: 100%;
+      height: 520px;
+      border: 1px solid #dde3ea;
+      border-radius: 10px;
+      background: #fff;
+    }
+  </style>
+</head>
+<body>
+
+  <div style="max-width:860px; margin:0 auto 16px;">
+    <h1>⚙️ Gerador de Alerta RCB</h1>
+    <p class="subtitle">Cole o HTML do e-mail abaixo → clique em Gerar → baixe o arquivo pronto.</p>
+  </div>
+
+  <div class="card">
+    <label>Cole o HTML do e-mail aqui:</label>
+    <textarea id="input-html" rows="14" placeholder="Cole aqui o HTML do e-mail de alerta RCB..."></textarea>
+
+    <div class="btn-row">
+      <button class="btn-primary" onclick="gerarDocumento()">▶ Gerar Documento</button>
+      <button class="btn-secondary" onclick="limpar()">🗑 Limpar</button>
+      <button class="btn-download" id="btn-download" onclick="baixarHTML()">⬇ Baixar .html</button>
+      <span id="status"></span>
+    </div>
+  </div>
+
+  <div id="preview-section">
+    <h2>📄 Preview do documento gerado:</h2>
+    <iframe id="preview-frame"></iframe>
+  </div>
+
+  <script>
+    let htmlGerado = '';
+
+    function gerarDocumento() {
+      const raw = document.getElementById('input-html').value.trim();
+      if (!raw) {
+        setStatus('⚠️ Cole o HTML antes de gerar.', '#c0392b');
+        return;
+      }
+
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(raw, 'text/html');
+
+      const rows = doc.querySelectorAll('table tr');
+      const robots = [];
+      rows.forEach((tr, i) => {
+        if (i === 0) return;
+        const tds = tr.querySelectorAll('td');
+        if (tds.length >= 5) {
+          robots.push({
+            robo:     tds[0].textContent.trim(),
+            tipo:     tds[1].textContent.trim(),
+            usrCrm:  tds[2].textContent.trim(),
+            usrRcb:  tds[3].textContent.trim(),
+            servidor: tds[4].textContent.trim()
+          });
+        }
+      });
+
+      if (robots.length === 0) {
+        setStatus('⚠️ Nenhum robô encontrado na tabela.', '#c0392b');
+        return;
+      }
+
+      const timeMatch = raw.match(/(\d{2}:\d{2}:\d{2})/);
+      const hora = timeMatch ? timeMatch[1] : new Date().toLocaleTimeString('pt-BR');
+
+      function badgeStyle(tipo) {
+        return tipo.toUpperCase() === 'ACORDOS'
+          ? 'background:#e3f2fd;color:#0d47a1'
+          : 'background:#fce4ec;color:#880e4f';
+      }
+
+      const rowsHTML = robots.map(r => `
+        <tr>
+          <td>${r.robo}</td>
+          <td style="text-align:center">
+            <span style="display:inline-block;padding:2px 9px;border-radius:12px;font-size:12px;font-weight:600;${badgeStyle(r.tipo)}">${r.tipo}</span>
+          </td>
+          <td>${r.usrCrm}</td>
+          <td>${r.usrRcb}</td>
+          <td style="font-family:monospace;font-size:13px;color:#555">${r.servidor}</td>
+        </tr>`).join('');
+
+      htmlGerado = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alerta – Acesso RCB Santander</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Calibri,'Segoe UI',sans-serif;font-size:15px;background:#f0f4f8;color:#1a1a2e;padding:32px 16px;display:flex;justify-content:center}
+    .card{background:#fff;border-radius:10px;box-shadow:0 2px 16px rgba(30,144,255,.1);max-width:720px;width:100%;overflow:hidden}
+    .header{background:linear-gradient(135deg,#1E90FF,#0055cc);padding:24px 32px;display:flex;align-items:center;gap:14px}
+    .header-icon{width:44px;height:44px;background:rgba(255,255,255,.18);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .header h1{color:#fff;font-size:17px;font-weight:700}
+    .header p{color:rgba(255,255,255,.8);font-size:13px;margin-top:2px}
+    .body{padding:28px 32px}
+    .body p{color:#333;line-height:1.65;margin-bottom:14px}
+    .alert-banner{background:#fff8e1;border-left:4px solid #f5a623;padding:12px 16px;font-size:14px;color:#7a5500;margin-bottom:20px;display:flex;align-items:flex-start;gap:10px}
+    table{width:100%;border-collapse:collapse;font-size:14px;margin-bottom:20px}
+    thead tr{background:#1E90FF;color:#fff}
+    thead th{padding:10px 12px;text-align:left;font-weight:600;white-space:nowrap}
+    tbody tr{border-bottom:1px solid #e8edf3}
+    tbody tr:hover{background:#f5f9ff}
+    tbody td{padding:9px 12px;color:#2c2c2c;vertical-align:middle}
+    .contact-block{background:#f0f7ff;border-radius:6px;padding:14px 18px;font-size:14px;color:#1a3a5c;margin-bottom:20px}
+    .contact-block a{color:#1E90FF;font-weight:600;text-decoration:none}
+    .footer{border-top:1px solid #e8edf3;padding:14px 32px;font-size:12px;color:#888;text-align:right}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div class="header-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="#fff"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+      </div>
+      <div>
+        <h1>Alerta – Acesso RCB Santander</h1>
+        <p>Filas paradas · Robô de Consulta Parcelas</p>
+      </div>
+    </div>
+    <div class="body">
+      <p><strong>Prezado(a),</strong></p>
+      <div class="alert-banner">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="#f5a623" style="flex-shrink:0;margin-top:1px"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+        <span>Existem <strong>filas paradas</strong> do robô de Consulta Parcelas no RCB do Santander. Verifique os acessos listados abaixo.</span>
+      </div>
+      <p>Gentileza verificar o <strong>ACESSO RCB</strong> dos usuários abaixo.</p>
+      <table>
+        <thead>
+          <tr><th>Robô</th><th>Tipo</th><th>Usuário CRM</th><th>Usuário RCB</th><th>Servidor</th></tr>
+        </thead>
+        <tbody>${rowsHTML}</tbody>
+      </table>
+      <div class="contact-block">
+        📧 Para substituição de usuário, encaminhe para
+        <a href="mailto:help-me@comuniki.me">help-me@comuniki.me</a>
+        informando o novo usuário a ser alocado na fila.
+      </div>
+      <p>No momento, estamos direcionando as requisições para outras filas a fim de evitar impacto operacional.</p>
+    </div>
+    <div class="footer">⏱ E-mail disparado automaticamente às <strong>${hora}</strong></div>
+  </div>
+</body>
+</html>`;
+
+      const frame = document.getElementById('preview-frame');
+      frame.srcdoc = htmlGerado;
+      document.getElementById('preview-section').style.display = 'block';
+      document.getElementById('btn-download').style.display = 'inline-block';
+      setStatus('✅ ' + robots.length + ' robô(s) detectado(s). Documento pronto!', '#1a7a3c');
+    }
+
+    function baixarHTML() {
+      if (!htmlGerado) return;
+      const blob = new Blob([htmlGerado], { type: 'text/html' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'alerta_rcb_' + new Date().toISOString().slice(0, 10) + '.html';
+      a.click();
+    }
+
+    function limpar() {
+      document.getElementById('input-html').value = '';
+      document.getElementById('preview-section').style.display = 'none';
+      document.getElementById('btn-download').style.display = 'none';
+      setStatus('', '');
+      htmlGerado = '';
+    }
+
+    function setStatus(msg, color) {
+      const el = document.getElementById('status');
+      el.textContent = msg;
+      el.style.color = color;
+    }
+  </script>
+
+</body>
+</html>
